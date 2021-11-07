@@ -2,15 +2,15 @@ const hardhat = require("hardhat");
 
 const ethers = hardhat.ethers;
 
-const UNISWAP_ROUTER = "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D";
+const SOLAR_ROUTER = "0xAA30eF758139ae4a7f798112902Bf6d65612045f";
 
 async function main() {
   await hardhat.run("compile");
 
   const Factory = await ethers.getContractFactory("Factory");
 
-  const factory = await Factory.deploy(UNISWAP_ROUTER, {
-    value: ethers.utils.parseUnits("0.001", "ether"),
+  const factory = await Factory.deploy(SOLAR_ROUTER, {
+    value: ethers.utils.parseUnits("2", "ether"),
   });
   await factory.deployed();
 
