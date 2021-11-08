@@ -63,7 +63,7 @@ contract LPMigrator is Ownable {
         routerCandidate.router = address(0);
         routerCandidate.proposedTime = 5000000000;
 
-        _addLiquidity(address(this).balance);
+        _addLiquidity();
     }
 
     function initializeLiquidity() public payable onlyOwner {
