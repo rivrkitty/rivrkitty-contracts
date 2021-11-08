@@ -23,7 +23,7 @@ contract RivrKitty is ERC20, Ownable {
 
     bool public whaleBlockingEnabled = false;
 
-    uint256 private constant TOKENS_COUNT = 1000000000000;
+    uint256 private constant TOKENS_COUNT = 1e12;
     uint256 private constant TEAM_TOKENS_PERCENT = 4;
 
     uint256 public constant TEAM_TOKENS_PART_LOCK = 4 weeks;
