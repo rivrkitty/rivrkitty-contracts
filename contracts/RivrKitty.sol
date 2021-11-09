@@ -7,11 +7,10 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Capped.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/TokenTimelock.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 
 import "./interfaces/IUniswapV2Router02.sol";
 
-contract RivrKitty is ERC20, Ownable {
+contract RivrKitty is ERC20 {
     using SafeERC20 for IERC20;
     using SafeMath for uint256;
 
@@ -29,7 +28,7 @@ contract RivrKitty is ERC20, Ownable {
     uint256 public constant TEAM_TOKENS_PART_LOCK = 4 weeks;
     uint256 public constant WHALES_TIMEOUT = 1 weeks;
 
-    constructor(address _devAddress) payable ERC20("RivrKitty", "KITTY") {
+    constructor(address _devAddress) payable ERC20("RivrKitty", "RKITTY") {
         startTime = block.timestamp;
 
         uint256 allTokens = TOKENS_COUNT * 10**decimals();
@@ -83,7 +82,7 @@ contract RivrKitty is ERC20, Ownable {
         ) {
             uint256 newBal = this.balanceOf(recipient).add(amount);
             uint256 maxBal = totalSupply().mul(3).div(100);
-            require(newBal < maxBal, "!whale reject");
+            require(newBal <= maxBal, "!whale reject");
         }
 
         _transfer(_msgSender(), recipient, amount);
@@ -91,7 +90,7 @@ contract RivrKitty is ERC20, Ownable {
         return true;
     }
 
-    function enableWhaleBlocking() public onlyOwner {
+    function enableWhaleBlocking() public {
         whaleBlockingEnabled = true;
     }
 }

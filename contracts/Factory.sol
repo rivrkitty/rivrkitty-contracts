@@ -14,11 +14,9 @@ contract Factory {
     RivrKitty public token;
     LPMigrator public migrator;
 
-    constructor(
-        address _router,
-        address _devAddress,
-        uint256 _migratorApprovalDelay
-    ) payable {
+    uint256 public constant MIGRATOR_APPROVAL_DELAY = 1 weeks;
+
+    constructor(address _router, address _devAddress) payable {
         token = new RivrKitty(_devAddress);
 
         uint256 bal = token.balanceOf(address(this));
@@ -27,7 +25,7 @@ contract Factory {
         migrator = new LPMigrator(
             address(token),
             _router,
-            _migratorApprovalDelay
+            MIGRATOR_APPROVAL_DELAY
         );
         IERC20(address(token)).safeTransfer(address(migrator), bal);
         migrator.initializeLiquidity{value: msg.value}();

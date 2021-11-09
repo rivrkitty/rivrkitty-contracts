@@ -20,7 +20,7 @@ contract LPMigrator is Ownable {
     }
 
     address public router;
-    uint256 public immutable approvalDelay;
+    uint256 public approvalDelay;
     address public immutable token;
     bool public initialized = false;
     // The last proposed strategy to switch to.
@@ -84,6 +84,14 @@ contract LPMigrator is Ownable {
             block.timestamp
         );
         initialized = true;
+    }
+
+    function increaseApprovalDelayTo(uint256 _approvalDelay) public onlyOwner {
+        require(
+            _approvalDelay > approvalDelay,
+            "!new approval delay smaller than old"
+        );
+        approvalDelay = _approvalDelay;
     }
 
     function _removeLiquidity() internal {

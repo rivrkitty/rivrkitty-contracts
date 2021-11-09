@@ -66,7 +66,10 @@ describe("RivrKitty", function () {
       const totalSupply = await this.kitty.totalSupply();
       const transfer = this.kitty
         .connect(this.signer)
-        .transfer(this.otherAccount.address, totalSupply.mul(3).div(100));
+        .transfer(
+          this.otherAccount.address,
+          totalSupply.mul(3).div(100).add(1)
+        );
       await expect(transfer).to.revertedWith("!whale reject");
     });
 
@@ -77,9 +80,9 @@ describe("RivrKitty", function () {
       const totalSupply = await this.kitty.totalSupply();
       await this.kitty
         .connect(this.signer)
-        .transfer(this.otherAccount.address, totalSupply.mul(2).div(100));
+        .transfer(this.otherAccount.address, totalSupply.mul(3).div(100));
       expect(await this.kitty.balanceOf(this.otherAccount.address)).to.equal(
-        totalSupply.mul(2).div(100)
+        totalSupply.mul(3).div(100)
       );
     });
     it("Transfer success with after 7 days", async function () {
