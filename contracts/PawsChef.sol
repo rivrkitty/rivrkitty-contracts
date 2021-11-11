@@ -8,8 +8,10 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "./KittyPaws.sol";
+import "./interfaces/IMasterChef.sol";
 
-// Copied and changed from SolarDistributor with few twicks - removed meta, forwarder, lockup, devAddress
+// Copied and changed from SolarDistributor with few twicks - removed meta, forwarder, lockup, devAddress.
+// Added possibility to add LP to for additional farm rewards
 contract PawsChef is Ownable, ReentrancyGuard {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
@@ -28,6 +30,9 @@ contract PawsChef is Ownable, ReentrancyGuard {
         uint256 accPawsPerShare; // Accumulated Paws per share, times 1e12. See below.
         uint16 depositFeeBP; // Deposit fee in basis points
         uint256 totalLp; // Total token in Pool
+        address addRewardChef; // Additional reward chef - lpToken will be deposited in that chef, not in PawsChef
+        uint256 addRewardChefPid; // Additional reward chef pid - pid of farm at additional reward chef
+        address addRewardToken; // Additional reward token that user gets
     }
 
     KittyPaws public paws;
@@ -95,7 +100,7 @@ contract PawsChef is Ownable, ReentrancyGuard {
         _;
     }
 
-    constructor(IPawsERC20 _paws, uint256 _pawsPerBlock) {
+    constructor(KittyPaws _paws, uint256 _pawsPerBlock) {
         //StartBlock always many years later from contract construct, will be set later in StartFarming function
         startBlock = block.number + (10 * 365 * 24 * 60 * 60);
 
@@ -172,9 +177,57 @@ contract PawsChef is Ownable, ReentrancyGuard {
                 lastRewardBlock: lastRewardBlock,
                 accPawsPerShare: 0,
                 depositFeeBP: _depositFeeBP,
-                totalLp: 0
+                totalLp: 0,
+                addRewardChef: address(0x0),
+                addRewardChefPid: 0,
+                addRewardToken: address(0x0)
             })
         );
+    }
+
+    function addWithAddReward(
+        uint256 _allocPoint,
+        IERC20 _lpToken,
+        uint16 _depositFeeBP,
+        bool _withUpdate,
+        address _addRewardChef,
+        uint256 _addRewardChefPid,
+        address _addRewardToken
+    ) public onlyOwner {
+        require(
+            _depositFeeBP <= MAXIMUM_DEPOSIT_FEE_RATE,
+            "addWithAddReward: deposit fee too high"
+        );
+        require(
+            _addRewardChef != address(0x0),
+            "addWithAddReward: reward chef cannot be 0x0"
+        );
+        require(
+            _addRewardToken != address(0x0),
+            "addWithAddReward: reward token cannot be 0x0"
+        );
+        if (_withUpdate) {
+            massUpdatePools();
+        }
+        uint256 lastRewardBlock = block.number > startBlock
+            ? block.number
+            : startBlock;
+        totalAllocPoint = totalAllocPoint.add(_allocPoint);
+        poolInfo.push(
+            PoolInfo({
+                lpToken: _lpToken,
+                allocPoint: _allocPoint,
+                lastRewardBlock: lastRewardBlock,
+                accPawsPerShare: 0,
+                depositFeeBP: _depositFeeBP,
+                totalLp: 0,
+                addRewardChef: _addRewardChef,
+                addRewardChefPid: _addRewardChefPid,
+                addRewardToken: _addRewardToken
+            })
+        );
+
+        IERC20(_lpToken).safeApprove(_addRewardChef, type(uint128).max);
     }
 
     // Update the given pool's Paws allocation point and deposit fee. Can only be called by the owner.
@@ -259,6 +312,10 @@ contract PawsChef is Ownable, ReentrancyGuard {
             pawsReward.mul(1e12).div(pool.totalLp)
         );
         pool.lastRewardBlock = block.number;
+
+        if (isAddRewardPool(_pid)) {
+            IMasterChef(pool.addRewardChef).deposit(pool.addRewardChefPid, 0);
+        }
     }
 
     // Deposit LP tokens to MasterChef for Paws allocation.
@@ -268,12 +325,23 @@ contract PawsChef is Ownable, ReentrancyGuard {
             "PawsChef: Can not deposit before start"
         );
 
-        PoolInfo storage pool = poolInfo[_pid];
-        UserInfo storage user = userInfo[_pid][_msgSender()];
-
         updatePool(_pid);
 
         payPendingPaws(_pid);
+        payPendingAddRewards(_pid);
+
+        if (isAddRewardPool(_pid)) {
+            _depositWithReward(_pid, _amount);
+        } else {
+            _depositWithoutReward(_pid, _amount);
+        }
+
+        emit Deposit(_msgSender(), _pid, _amount);
+    }
+
+    function _depositWithoutReward(uint256 _pid, uint256 _amount) internal {
+        PoolInfo storage pool = poolInfo[_pid];
+        UserInfo storage user = userInfo[_pid][_msgSender()];
 
         if (_amount > 0) {
             uint256 beforeDeposit = pool.lpToken.balanceOf(address(this));
@@ -296,8 +364,48 @@ contract PawsChef is Ownable, ReentrancyGuard {
                 totalPawsInPools = totalPawsInPools.add(_amount);
             }
         }
+
         user.rewardDebt = user.amount.mul(pool.accPawsPerShare).div(1e12);
-        emit Deposit(_msgSender(), _pid, _amount);
+    }
+
+    function _depositWithReward(uint256 _pid, uint256 _amount) internal {
+        PoolInfo storage pool = poolInfo[_pid];
+        UserInfo storage user = userInfo[_pid][_msgSender()];
+
+        if (_amount > 0) {
+            uint256 beforeDeposit = pool.lpToken.balanceOf(address(this));
+            pool.lpToken.safeTransferFrom(_msgSender(), address(this), _amount);
+            uint256 afterDeposit = pool.lpToken.balanceOf(address(this));
+
+            _amount = afterDeposit.sub(beforeDeposit);
+
+            if (pool.depositFeeBP > 0) {
+                uint256 depositFee = _amount.mul(pool.depositFeeBP).div(10000);
+                pool.lpToken.safeTransfer(feeAddress, depositFee);
+
+                _amount = _amount.sub(depositFee);
+            }
+
+            (uint256 beforeChefDeposit, ) = IMasterChef(pool.addRewardChef)
+                .userInfo(pool.addRewardChefPid, address(this));
+            IMasterChef(pool.addRewardChef).deposit(
+                pool.addRewardChefPid,
+                _amount
+            );
+            (uint256 afterChefDeposit, ) = IMasterChef(pool.addRewardChef)
+                .userInfo(pool.addRewardChefPid, address(this));
+
+            _amount = afterChefDeposit.sub(beforeChefDeposit);
+
+            user.amount = user.amount.add(_amount);
+            pool.totalLp = pool.totalLp.add(_amount);
+
+            if (address(pool.lpToken) == address(paws)) {
+                totalPawsInPools = totalPawsInPools.add(_amount);
+            }
+        }
+
+        user.rewardDebt = user.amount.mul(pool.accPawsPerShare).div(1e12);
     }
 
     // Withdraw tokens
@@ -319,6 +427,7 @@ contract PawsChef is Ownable, ReentrancyGuard {
         updatePool(_pid);
 
         payPendingPaws(_pid);
+        payPendingAddRewards(_pid);
 
         if (_amount > 0) {
             user.amount = user.amount.sub(_amount);
@@ -326,7 +435,19 @@ contract PawsChef is Ownable, ReentrancyGuard {
             if (address(pool.lpToken) == address(paws)) {
                 totalPawsInPools = totalPawsInPools.sub(_amount);
             }
-            pool.lpToken.safeTransfer(_msgSender(), _amount);
+            if (isAddRewardPool(_pid)) {
+                uint256 beforeWithdraw = pool.lpToken.balanceOf(address(this));
+                IMasterChef(pool.addRewardChef).withdraw(
+                    pool.addRewardChefPid,
+                    _amount
+                );
+                uint256 afterWithdraw = pool.lpToken.balanceOf(address(this));
+                _amount = afterWithdraw.sub(beforeWithdraw);
+
+                pool.lpToken.safeTransfer(_msgSender(), _amount);
+            } else {
+                pool.lpToken.safeTransfer(_msgSender(), _amount);
+            }
         }
         user.rewardDebt = user.amount.mul(pool.accPawsPerShare).div(1e12);
         emit Withdraw(_msgSender(), _pid, _amount);
@@ -351,7 +472,19 @@ contract PawsChef is Ownable, ReentrancyGuard {
         if (address(pool.lpToken) == address(paws)) {
             totalPawsInPools = totalPawsInPools.sub(amount);
         }
-        pool.lpToken.safeTransfer(_msgSender(), amount);
+        if (isAddRewardPool(_pid)) {
+            uint256 beforeWithdraw = pool.lpToken.balanceOf(address(this));
+            IMasterChef(pool.addRewardChef).withdraw(
+                pool.addRewardChefPid,
+                amount
+            );
+            uint256 afterWithdraw = pool.lpToken.balanceOf(address(this));
+            amount = afterWithdraw.sub(beforeWithdraw);
+
+            pool.lpToken.safeTransfer(_msgSender(), amount);
+        } else {
+            pool.lpToken.safeTransfer(_msgSender(), amount);
+        }
 
         emit EmergencyWithdraw(_msgSender(), _pid, amount);
     }
@@ -367,6 +500,17 @@ contract PawsChef is Ownable, ReentrancyGuard {
         if (pending > 0) {
             // send rewards
             safePawsTransfer(_msgSender(), pending);
+        }
+    }
+
+    function payPendingAddRewards(uint256 _pid) internal {
+        if (isAddRewardPool(_pid)) {
+            PoolInfo storage pool = poolInfo[_pid];
+            UserInfo storage user = userInfo[_pid][_msgSender()];
+            uint256 share = user.amount.mul(1e12).div(pool.totalLp);
+            uint256 bal = IERC20(pool.addRewardToken).balanceOf(address(this));
+            uint256 amount = share.mul(bal).div(1e12);
+            IERC20(pool.addRewardToken).safeTransfer(_msgSender(), amount);
         }
     }
 
@@ -421,5 +565,13 @@ contract PawsChef is Ownable, ReentrancyGuard {
             _allocPoint
         );
         poolInfo[_pid].allocPoint = _allocPoint;
+    }
+
+    function isAddRewardPool(uint256 _pid) public view returns (bool) {
+        PoolInfo storage pool = poolInfo[_pid];
+        return
+            pool.addRewardChef != address(0x0) &&
+            pool.addRewardToken != address(0x0) &&
+            pool.addRewardChefPid >= 0;
     }
 }
