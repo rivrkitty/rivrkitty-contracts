@@ -97,7 +97,7 @@ describe("PawsChef", function () {
       const RewardChef = await ethers.getContractFactory("PawsChef");
       this.rewardChef = await RewardChef.deploy(
         this.addRewardToken.address,
-        ethers.BigNumber.from(10).pow(9)
+        ethers.BigNumber.from(10).pow(10)
       );
       await this.rewardChef.deployed();
 
@@ -176,8 +176,8 @@ describe("PawsChef", function () {
         expectedPaws2.toNumber()
       );
 
-      await this.chef.withdraw(0, this.balFirst);
-      await this.chef.connect(this.otherAccount).withdraw(0, this.balSecond);
+      await this.chef.deposit(0, 0);
+      await this.chef.connect(this.otherAccount).deposit(0, 0);
 
       const receivedPaws1 = await this.paws.balanceOf(this.signer.address);
       const receivedPaws2 = await this.paws.balanceOf(
@@ -202,6 +202,41 @@ describe("PawsChef", function () {
       );
       expect(receivedAddRewards1.toNumber()).to.be.greaterThan(
         receivedAddRewards2.toNumber()
+      );
+    });
+
+    it("should not take too much rewards", async function () {
+      await this.chef.connect(this.otherAccount).deposit(0, this.balSecond);
+      await timeTravel(ethers, 2);
+      await timeTravel(ethers, 2);
+      await timeTravel(ethers, 2);
+      await timeTravel(ethers, 2);
+      await timeTravel(ethers, 2);
+      await timeTravel(ethers, 2);
+      await timeTravel(ethers, 2);
+      await timeTravel(ethers, 2);
+      await this.chef.deposit(0, this.balFirst);
+      await timeTravel(ethers, 2);
+      await this.chef.withdraw(0, 0);
+      await this.chef.connect(this.otherAccount).withdraw(0, 0);
+      await this.chef.withdraw(0, this.balFirst);
+      await this.chef.connect(this.otherAccount).withdraw(0, this.balSecond);
+
+      const receivedPaws1 = await this.paws.balanceOf(this.signer.address);
+      const receivedPaws2 = await this.paws.balanceOf(
+        this.otherAccount.address
+      );
+      expect(receivedPaws2.toNumber()).to.be.greaterThan(
+        receivedPaws1.toNumber()
+      );
+      const receivedAddRewards1 = await this.addRewardToken.balanceOf(
+        this.signer.address
+      );
+      const receivedAddRewards2 = await this.addRewardToken.balanceOf(
+        this.otherAccount.address
+      );
+      expect(receivedAddRewards2.toNumber()).to.be.greaterThan(
+        receivedAddRewards1.toNumber()
       );
     });
 
@@ -300,8 +335,8 @@ describe("PawsChef", function () {
         expectedPaws2.toNumber()
       );
 
-      await this.chef.withdraw(0, this.balFirst);
-      await this.chef.connect(this.otherAccount).withdraw(0, this.balSecond);
+      await this.chef.deposit(0, 0);
+      await this.chef.connect(this.otherAccount).deposit(0, 0);
 
       const receivedPaws1 = await this.paws.balanceOf(this.signer.address);
       const receivedPaws2 = await this.paws.balanceOf(

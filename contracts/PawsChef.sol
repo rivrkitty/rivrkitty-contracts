@@ -20,6 +20,7 @@ contract PawsChef is Ownable, ReentrancyGuard {
     struct UserInfo {
         uint256 amount; // How many LP tokens the user has provided.
         uint256 rewardDebt; // Reward debt. See explanation below.
+        uint256 addRewardDebt;
     }
 
     // Info of each pool.
@@ -33,6 +34,7 @@ contract PawsChef is Ownable, ReentrancyGuard {
         address addRewardChef; // Additional reward chef - lpToken will be deposited in that chef, not in PawsChef
         uint256 addRewardChefPid; // Additional reward chef pid - pid of farm at additional reward chef
         address addRewardToken; // Additional reward token that user gets
+        uint256 accAddRewardsPerShare;
     }
 
     KittyPaws public paws;
@@ -180,7 +182,8 @@ contract PawsChef is Ownable, ReentrancyGuard {
                 totalLp: 0,
                 addRewardChef: address(0x0),
                 addRewardChefPid: 0,
-                addRewardToken: address(0x0)
+                addRewardToken: address(0x0),
+                accAddRewardsPerShare: 0
             })
         );
     }
@@ -223,7 +226,8 @@ contract PawsChef is Ownable, ReentrancyGuard {
                 totalLp: 0,
                 addRewardChef: _addRewardChef,
                 addRewardChefPid: _addRewardChefPid,
-                addRewardToken: _addRewardToken
+                addRewardToken: _addRewardToken,
+                accAddRewardsPerShare: 0
             })
         );
 
@@ -314,7 +318,17 @@ contract PawsChef is Ownable, ReentrancyGuard {
         pool.lastRewardBlock = block.number;
 
         if (isAddRewardPool(_pid)) {
+            uint256 beforeBal = IERC20(pool.addRewardToken).balanceOf(
+                address(this)
+            );
             IMasterChef(pool.addRewardChef).deposit(pool.addRewardChefPid, 0);
+            uint256 afterBal = IERC20(pool.addRewardToken).balanceOf(
+                address(this)
+            );
+            uint256 addReward = afterBal.sub(beforeBal);
+            pool.accAddRewardsPerShare = pool.accAddRewardsPerShare.add(
+                addReward.mul(1e12).div(pool.totalLp)
+            );
         }
     }
 
@@ -328,7 +342,6 @@ contract PawsChef is Ownable, ReentrancyGuard {
         updatePool(_pid);
 
         payPendingPaws(_pid);
-        payPendingAddRewards(_pid);
 
         if (isAddRewardPool(_pid)) {
             _depositWithReward(_pid, _amount);
@@ -405,6 +418,9 @@ contract PawsChef is Ownable, ReentrancyGuard {
         }
 
         user.rewardDebt = user.amount.mul(pool.accPawsPerShare).div(1e12);
+        user.addRewardDebt = user.amount.mul(pool.accAddRewardsPerShare).div(
+            1e12
+        );
     }
 
     // Withdraw tokens
@@ -426,7 +442,6 @@ contract PawsChef is Ownable, ReentrancyGuard {
         updatePool(_pid);
 
         payPendingPaws(_pid);
-        payPendingAddRewards(_pid);
 
         if (_amount > 0) {
             user.amount = user.amount.sub(_amount);
@@ -449,6 +464,9 @@ contract PawsChef is Ownable, ReentrancyGuard {
             }
         }
         user.rewardDebt = user.amount.mul(pool.accPawsPerShare).div(1e12);
+        user.addRewardDebt = user.amount.mul(pool.accAddRewardsPerShare).div(
+            1e12
+        );
         emit Withdraw(_msgSender(), _pid, _amount);
     }
 
@@ -466,6 +484,7 @@ contract PawsChef is Ownable, ReentrancyGuard {
 
         user.amount = 0;
         user.rewardDebt = 0;
+        user.addRewardDebt = 0;
         pool.totalLp = pool.totalLp.sub(amount);
 
         if (address(pool.lpToken) == address(paws)) {
@@ -500,17 +519,19 @@ contract PawsChef is Ownable, ReentrancyGuard {
             // send rewards
             safePawsTransfer(_msgSender(), pending);
         }
-    }
 
-    function payPendingAddRewards(uint256 _pid) internal {
         if (isAddRewardPool(_pid)) {
-            PoolInfo storage pool = poolInfo[_pid];
-            UserInfo storage user = userInfo[_pid][_msgSender()];
-            uint256 bal = IERC20(pool.addRewardToken).balanceOf(address(this));
-            if (pool.totalLp > 0 && bal > 0) {
-                uint256 share = user.amount.mul(1e12).div(pool.totalLp);
-                uint256 amount = share.mul(bal).div(1e12);
-                IERC20(pool.addRewardToken).safeTransfer(_msgSender(), amount);
+            uint256 addPending = user
+                .amount
+                .mul(pool.accAddRewardsPerShare)
+                .div(1e12)
+                .sub(user.addRewardDebt);
+            if (addPending > 0) {
+                safeAddRewardsTransfer(
+                    pool.addRewardToken,
+                    _msgSender(),
+                    addPending
+                );
             }
         }
     }
@@ -527,6 +548,19 @@ contract PawsChef is Ownable, ReentrancyGuard {
             } else if (_amount > 0) {
                 paws.transfer(_to, _amount);
             }
+        }
+    }
+
+    function safeAddRewardsTransfer(
+        address _addToken,
+        address _to,
+        uint256 _amount
+    ) internal {
+        uint256 addBal = IERC20(_addToken).balanceOf(address(this));
+        if (_amount >= addBal) {
+            IERC20(_addToken).safeTransfer(_to, addBal);
+        } else if (_amount > 0) {
+            IERC20(_addToken).safeTransfer(_to, _amount);
         }
     }
 
