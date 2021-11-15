@@ -16,6 +16,7 @@ contract ChefFactory {
         chef.setFeeAddress(_feeAddress);
         // TODO: Wrap multisig into timelock and set timelock as operator
         chef.transferOperator(_multisig);
+        chef.transferOwnership(_multisig);
 
         paws.transferOwnership(address(chef));
     }

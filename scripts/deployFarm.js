@@ -8,18 +8,19 @@ const ethers = hardhat.ethers;
 async function main() {
   await hardhat.run("compile");
 
+  const signer = await ethers.getSigner();
   const ChefFactory = await ethers.getContractFactory("ChefFactory");
-  const multisigAddress = (await ethers.getSigner()).address;
+  const multisigAddress = signer.address;
 
-  console.log("Deploying...", (await ethers.getSigner()).address);
+  console.log("Deploying...", multisigAddress);
 
   // const gasPrice = ethers.BigNumber.from("9000000000");
   const chefFactory = await ChefFactory.deploy(
     multisigAddress,
-    multisigAddress,
-    {
-      // gasPrice,
-    }
+    multisigAddress
+    // {
+    //   // gasPrice,
+    // }
   );
 
   console.log("Waiting for confirmation...");
