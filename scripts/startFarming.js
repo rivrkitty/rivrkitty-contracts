@@ -3,7 +3,7 @@ const hardhat = require("hardhat");
 const ethers = hardhat.ethers;
 
 // Moonbase alpha
-const chefAddress = "0x09B7435F39ef4c0c5E9faD4A2bf0Ae19999A7316";
+const chefAddress = "0x364de9a286bEcd1848Ee7D670431eb0fEC0596D3";
 
 async function main() {
   await hardhat.run("compile");

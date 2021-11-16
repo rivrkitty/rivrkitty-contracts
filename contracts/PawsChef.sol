@@ -256,7 +256,7 @@ contract PawsChef is Ownable, ReentrancyGuard {
     }
 
     // View function to see pending Paws on frontend.
-    function pendingPaws(uint256 _pid, address _user)
+    function pendingReward(uint256 _pid, address _user)
         external
         view
         returns (uint256)

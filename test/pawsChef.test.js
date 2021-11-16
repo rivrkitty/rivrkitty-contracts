@@ -1,3 +1,4 @@
+const { BigNumber } = require("@ethersproject/bignumber");
 const { expect } = require("chai");
 const { ethers, artifacts } = require("hardhat");
 const { timeTravel } = require("./utils");
@@ -160,12 +161,15 @@ describe("PawsChef", function () {
         this.balSecond.toNumber()
       );
 
-      const expectedPaws1 = await this.chef.pendingPaws(0, this.signer.address);
-      const expectedPaws2 = await this.chef.pendingPaws(
+      const expectedPaws1 = await this.chef.pendingReward(
+        0,
+        this.signer.address
+      );
+      const expectedPaws2 = await this.chef.pendingReward(
         0,
         this.otherAccount.address
       );
-      const expectedAddRewards = await this.rewardChef.pendingPaws(
+      const expectedAddRewards = await this.rewardChef.pendingReward(
         0,
         this.chef.address
       );
@@ -274,6 +278,24 @@ describe("PawsChef", function () {
         this.balSecond
       );
     });
+
+    it("should calculate additional rewards via calc", async function () {
+      const AdditionalRewardCalc = await ethers.getContractFactory(
+        "AdditionalRewardCalc"
+      );
+      const calc = await AdditionalRewardCalc.deploy();
+      await calc.deployed();
+
+      await this.chef.deposit(0, this.balFirst);
+      await this.chef.connect(this.otherAccount).deposit(0, this.balSecond);
+      await timeTravel(ethers, 2);
+      await timeTravel(ethers, 2);
+      await timeTravel(ethers, 2);
+
+      expect(
+        await calc.pendingRewards(this.chef.address, 0, this.signer.address)
+      ).to.not.equal(ethers.BigNumber.from(0));
+    });
   });
 
   describe("Single rewards", async function () {
@@ -324,8 +346,11 @@ describe("PawsChef", function () {
         this.balSecond.toNumber()
       );
 
-      const expectedPaws1 = await this.chef.pendingPaws(0, this.signer.address);
-      const expectedPaws2 = await this.chef.pendingPaws(
+      const expectedPaws1 = await this.chef.pendingReward(
+        0,
+        this.signer.address
+      );
+      const expectedPaws2 = await this.chef.pendingReward(
         0,
         this.otherAccount.address
       );
