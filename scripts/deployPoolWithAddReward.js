@@ -3,29 +3,31 @@ const hardhat = require("hardhat");
 const ethers = hardhat.ethers;
 
 // moonbaseAlpha
-const chefAddress = "0x364de9a286bEcd1848Ee7D670431eb0fEC0596D3";
-const huckleChef = "0xd45F54838dbfCe0F976bD430bE5f8678479E1510";
-const finnAddress = "0x31b1644f8379a22d25f845a67f1ab346e76001aa";
+// const chefAddress = "0x364de9a286bEcd1848Ee7D670431eb0fEC0596D3";
+// const huckleChef = "0xd45F54838dbfCe0F976bD430bE5f8678479E1510";
+// const finnAddress = "0x31b1644f8379a22d25f845a67f1ab346e76001aa";
 
-// TODO: uncomment when releasing
-// const multisigAddress = "0xF21A3A541C3c96100A7BFb9b249220cdB631907d";
+// moonriver
+const chefAddress = "0x995ef3a5D14b66Ac5C7Fa1a967F8D9Cd727452bA";
+const huckleChef = "0x1f4b7660b6AdC3943b5038e3426B33c1c0e343E6";
+const finnAddress = "0x9A92B5EBf1F6F6f7d93696FCD44e5Cf75035A756";
 
 const addRewardChefAddress = huckleChef;
 const addRewardAddress = finnAddress;
 
 const deployArgs = {
-  allocPoint: 100,
-  lpToken: "0x7d92ac7065371e0e4a201eae7a263cd8146d7ccc",
+  allocPoint: 500,
+  lpToken: "0xDCd92eb568157D3c1a6b3AE53ADF18a230bc304A",
   depositFeeBP: 0,
   withUpdate: false,
   addRewardChef: addRewardChefAddress,
-  addRewardChefPid: 7,
+  addRewardChefPid: 19,
   addRewardToken: addRewardAddress,
 };
 
 const poolInfo = {
   platform: "Huckleberry",
-  platformUrl: "https://www.huckleberry.finance/#/swap",
+  platformUrl: "https://www.huckleberry.finance/",
   chefAddress: chefAddress,
   tokenAddress: deployArgs["lpToken"],
   buyTokenUrl: "https://www.huckleberry.finance/",

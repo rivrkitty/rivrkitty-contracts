@@ -11,7 +11,10 @@ async function main() {
 
   console.log("Deploying...");
 
-  const additionalRewardCalc = await AdditionalRewardCalc.deploy();
+  const gasPrice = ethers.BigNumber.from("4000000000");
+  const additionalRewardCalc = await AdditionalRewardCalc.deploy({
+    gasPrice,
+  });
 
   console.log("Waiting for confirmation...");
   await additionalRewardCalc.deployed();

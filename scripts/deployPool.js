@@ -3,14 +3,11 @@ const hardhat = require("hardhat");
 const ethers = hardhat.ethers;
 
 // moonbaseAlpha
-const chefAddress = "0x364de9a286bEcd1848Ee7D670431eb0fEC0596D3";
-
-// TODO: uncomment when releasing
-// const multisigAddress = "0xF21A3A541C3c96100A7BFb9b249220cdB631907d";
+const chefAddress = "0x995ef3a5D14b66Ac5C7Fa1a967F8D9Cd727452bA";
 
 const deployArgs = {
-  allocPoint: 100,
-  lpToken: "0x7d92ac7065371e0e4a201eae7a263cd8146d7ccc",
+  allocPoint: 500,
+  lpToken: "0x8e643094fb9941e273C2190563D7c514D56c841B",
   depositFeeBP: 0,
   withUpdate: false,
 };
